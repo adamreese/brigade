@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+import "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto";
+
+package pb;
+
+// JobStatus is a label for the condition of a Job at the current time.
+enum JobStatus {
+	// Unknown means that for some reason the state of the job could not be obtained, typically due
+	// to an error in communicating with the host of the job.
+	UNKNOWN = 0;
+	// Pending means the job has been accepted by the system, but one or more of the containers
+	// has not been started. This includes time before being bound to a node, as well as time spent
+	// pulling images onto the host.
+	PENDING = 1;
+	// Running means the job has been bound to a node and all of the containers have been started.
+	// At least one container is still running or is in the process of being restarted.
+	RUNNING = 2;
+	// Succeeded means that all containers in the job have voluntarily terminated
+	// with a container exit code of 0, and the system is not going to restart any of these containers.
+	SUCCEEDED = 3;
+	// Failed means that all containers in the job have terminated, and at least one container has
+	// terminated in a failure (exited with a non-zero exit code or was stopped by the system).
+	FAILED = 4;
+}
+
+message Job {
+  // ID is the name for the pod running this job
+  string id = 1;
+  // Name is the name for the job
+  string name = 2;
+  // Image is the execution environment running the job
+  string image = 3;
+  // CreationTime is a timestamp representing the server time when this object was
+  // created. It is not guaranteed to be set in happens-before order across separate operations.
+  google.protobuf.Timestamp creation_time = 4;
+  // StartTime is the time the job started.
+  google.protobuf.Timestamp start_time = 5;
+  // EndTime is the time the job completed. This may not be present
+  // if the job has not completed.
+  google.protobuf.Timestamp end_time = 6;
+  // ExitCode is the exit code of the job. This may not be present
+  // if the job has not completed.
+  int32 exit_code = 7;
+  // Status is a textual representation of the job's running status
+  JobStatus status = 8;
+}

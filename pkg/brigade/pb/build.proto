@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package pb;
+
+import "github.com/golang/protobuf/ptypes/timestamp/timestamp.proto";
+import "job.proto";
+
+message Build {
+	// ID is the unique ID for a webhook event.
+	string id = 1;
+	// ProjectID is the computed name of the project (brigade-aeff2343a3234ff)
+	string project_id = 2;
+	// Type is the event type (push, pull_request, tag, etc.)
+	string type = 3;
+	// Provider is the name of the service that caused the event (github, vsts, cron, ...)
+	string provider = 4;
+	// Commit is the ID of the VCS version, such as the Git commit SHA.
+	string commit = 5;
+	// Payload is the raw data as received by the webhook.
+	bytes payload = 6;
+	// Script is the brigadeJS to be executed.
+	bytes script = 7;
+}
+
+message BuildStatus {
+  string build_id = 1;
+  // CreationTime is a timestamp representing the server time when this object was
+  // created. It is not guaranteed to be set in happens-before order across separate operations.
+  google.protobuf.Timestamp creation_time = 4;
+  // StartTime is the time the job started.
+  google.protobuf.Timestamp start_time = 5;
+  // EndTime is the time the job completed. This may not be present
+  // if the job has not completed.
+  google.protobuf.Timestamp end_time = 6;
+  // ExitCode is the exit code of the job. This may not be present
+  // if the job has not completed.
+  int32 exit_code = 7;
+  // Status is a textual representation of the job's running status
+  JobStatus status = 8;
+}
+
+service Brigade {
+  rpc CreateBuild(Build) returns (stream BuildStatus) {}
+}

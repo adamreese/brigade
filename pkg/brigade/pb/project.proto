@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package pb;
+
+// Project describes an brigade project
+//
+// This is an internal representation of a project, and contains data that
+// should not be made available to the JavaScript runtime.
+message Project {
+	// ID is the computed name of the project (brigade-aeff2343a3234ff)
+  string id = 1;
+	// Name is the human readable name of project.
+  string name = 2;
+	// Repo describes the repository where the source code is stored.
+  Repo repo = 3;
+	// Kubernetes holds information about Kubernetes
+  Kubernetes kubernetes = 4;
+	// SharedSecret is the GitHub shared key
+  string shared_secret = 5;
+	// Github holds information about Github.
+  Github github = 6;
+	// Secrets is environment variables for brigade.js
+  map<string, string> secrets = 7;
+}
+
+// Repo describes a Git repository.
+message Repo {
+	// Name of the repository. For GitHub, this is of the form `org/name` or `user/name`
+  string name = 1;
+	// Owner of the repositoy. For Github this is `org` or `user`
+  string owner = 2;
+	// CloneURL is the URL at which the repository can be cloned
+	// Traditionally, this is an HTTPS URL.
+  string clone_url = 3;
+	// SSHKey is the auth string for SSH-based cloning
+  string ssh_key = 4;
+}
+
+// Kubernetes describes the Kubernetes configuration for a project.
+message Kubernetes {
+	// Namespace is the namespace of this project.
+  string namespace = 1;
+	// VCSSidecar is the image name/tag for the sidecar that pulls VCS data
+  string vcs_sidecar = 2;
+}
+
+// Github describes the Github configuration for a project.
+message Github {
+	// Token is used for oauth2 for client interactions.
+  string token = 1;
+}
