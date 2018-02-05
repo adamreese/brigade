@@ -23,7 +23,7 @@ func (c *Controller) syncSecret(secret *v1.Secret) error {
 	}
 	data := secret.Data
 
-	log.Printf("EventHandler: type=%s provider=%s commit=%s", data["event_type"], data["event_provider"], data["commit"])
+	log.Printf("EventHandler: type=%s provider=%s commit=%s", data["event_type"], data["event_provider"], data["commit_id"])
 
 	podClient := c.clientset.CoreV1().Pods(secret.Namespace)
 
@@ -50,7 +50,7 @@ func (c *Controller) syncSecret(secret *v1.Secret) error {
 		if _, err := podClient.Create(&pod); err != nil {
 			return err
 		}
-		log.Printf("Started %s for %q [%s] at %d", pod.Name, data["event_type"], data["commit"], pod.CreationTimestamp.Unix())
+		log.Printf("Started %s for %q [%s] at %d", pod.Name, data["event_type"], data["commit_id"], pod.CreationTimestamp.Unix())
 	}
 
 	return nil
