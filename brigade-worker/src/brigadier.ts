@@ -6,9 +6,9 @@
 
 /** */
 
-import * as jobImpl from "./job";
-import * as groupImpl from "./group";
 import * as eventsImpl from "./events";
+import * as groupImpl from "./group";
+import * as jobImpl from "./job";
 import { JobRunner } from "./k8s";
 
 // These are filled by the 'fire' event handler.
@@ -49,13 +49,13 @@ export function fire(e: eventsImpl.BrigadeEvent, p: eventsImpl.Project) {
  * executed as-is.
  */
 export class Job extends jobImpl.Job {
-  run(): Promise<jobImpl.Result> {
-    let jr = new JobRunner(this, currentEvent, currentProject);
+  public run(): Promise<jobImpl.Result> {
+    const jr = new JobRunner(this, currentEvent, currentProject);
     this._podName = jr.name;
     return jr.run().catch(err => {
       // Wrap the message to give clear context.
       console.error(err);
-      let msg = `job ${this.name}(${jr.name}): ${err}`;
+      const msg = `job ${this.name}(${jr.name}): ${err}`;
       return Promise.reject(new Error(msg));
     });
   }

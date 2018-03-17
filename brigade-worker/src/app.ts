@@ -1,11 +1,12 @@
 /**
  * Module app is the main application runner.
  */
-import * as events from "./events";
 import * as process from "process";
-import * as k8s from "./k8s";
+
 import * as brigadier from "./brigadier";
-import { Logger, ContextLogger } from "./logger";
+import * as events from "./events";
+import * as k8s from "./k8s";
+import { ContextLogger, Logger } from "./logger";
 
 interface BuildStorage {
   create(
@@ -40,6 +41,15 @@ export class App {
    * process trap is invoked, the runtime is not in a good state to continue.
    */
   public exitOnError: boolean = true;
+  /**
+   * loadProject is a function that loads projects.
+   */
+  public loadProject: ProjectLoader = k8s.loadProject;
+  /**
+   * buildStorage controls the per-build storage layer.
+   */
+  public buildStorage: BuildStorage = new k8s.BuildStorage();
+
   protected errorsHandled: boolean = false;
   protected logger: Logger = new ContextLogger("app");
   protected lastEvent: events.BrigadeEvent;
@@ -52,15 +62,6 @@ export class App {
   // true if the "after" event has fired.
   protected afterHasFired: boolean = false;
   protected storageIsDestroyed: boolean = false;
-  /**
-   * loadProject is a function that loads projects.
-   */
-  public loadProject: ProjectLoader = k8s.loadProject;
-  /**
-   * buildStorage controls the per-build storage layer.
-   */
-  public buildStorage: BuildStorage = new k8s.BuildStorage();
-
   /**
    * Create a new App.
    *
@@ -78,7 +79,7 @@ export class App {
     this.lastEvent = e;
 
     // This closure destroys storage for us. It is called by event handlers.
-    let destroyStorage = () => {
+    const destroyStorage = () => {
       // Since we catch a destroy error, the outer wrapper will
       // not get that error. Essentially, we swallow the error to prevent
       // cleanup from exiting > 0.
@@ -138,16 +139,16 @@ export class App {
         return;
       }
 
-      let after: events.BrigadeEvent = {
+      const after: events.BrigadeEvent = {
         buildID: e.buildID,
-        workerID: e.workerID,
-        type: "after",
-        provider: "brigade",
-        revision: e.revision,
         cause: {
           event: e,
-          trigger: code == 0 ? "success" : "failure"
-        } as events.Cause
+          trigger: code === 0 ? "success" : "failure"
+        } as events.Cause,
+        provider: "brigade",
+        revision: e.revision,
+        type: "after",
+        workerID: e.workerID
       };
 
       // Only fire an event if the top-level had a match.
@@ -187,17 +188,17 @@ export class App {
     }
     this.errorsHandled = true;
 
-    let errorEvent: events.BrigadeEvent = {
+    const errorEvent: events.BrigadeEvent = {
       buildID: this.lastEvent.buildID,
-      workerID: this.lastEvent.workerID,
-      type: "error",
-      provider: "brigade",
-      revision: this.lastEvent.revision,
       cause: {
         event: this.lastEvent,
-        reason: reason,
+        reason: `${reason}`,
         trigger: errorType
-      } as events.Cause
+      } as events.Cause,
+      provider: "brigade",
+      revision: this.lastEvent.revision,
+      type: "error",
+      workerID: this.lastEvent.workerID
     };
 
     brigadier.fire(errorEvent, this.proj);

@@ -29,9 +29,9 @@ import * as fs from "fs";
 import * as process from "process";
 import * as ulid from "ulid";
 
-import * as events from "./events";
 import { App } from "./app";
-import { Logger, ContextLogger } from "./logger";
+import * as events from "./events";
+import { ContextLogger, Logger } from "./logger";
 
 import { options } from "./k8s";
 
@@ -54,15 +54,15 @@ const requiredEnvVar = (name: string): string => {
 const projectID: string = requiredEnvVar("BRIGADE_PROJECT_ID");
 const projectNamespace: string = requiredEnvVar("BRIGADE_PROJECT_NAMESPACE");
 const defaultULID = ulid();
-let e: events.BrigadeEvent = {
+const e: events.BrigadeEvent = {
   buildID: process.env.BRIGADE_BUILD_ID || defaultULID,
-  workerID: process.env.BRIGADE_BUILD_NAME || `unknown-${defaultULID}`,
-  type: process.env.BRIGADE_EVENT_TYPE || "ping",
   provider: process.env.BRIGADE_EVENT_PROVIDER || "unknown",
   revision: {
     commit: process.env.BRIGADE_COMMIT_ID,
     ref: process.env.BRIGADE_COMMIT_REF || "refs/heads/master"
-  }
+  },
+  type: process.env.BRIGADE_EVENT_TYPE || "ping",
+  workerID: process.env.BRIGADE_BUILD_NAME || `unknown-${defaultULID}`
 };
 
 try {

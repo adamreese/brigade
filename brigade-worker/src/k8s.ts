@@ -5,9 +5,9 @@
 /** */
 
 import * as kubernetes from "@kubernetes/typescript-node";
-import * as jobs from "./job";
-import { Logger, ContextLogger } from "./logger";
 import { BrigadeEvent, Project } from "./events";
+import * as jobs from "./job";
+import { ContextLogger, Logger } from "./logger";
 
 // The internals for running tasks. This must be loaded before any of the
 // objects that use run().
@@ -36,25 +36,25 @@ const logger = new ContextLogger("k8s");
  * allowed to override (or ignore) 'options', though they should never modify
  * it.
  */
-export var options: KubernetesOptions = {
-  serviceAccount: "brigade-worker",
-  mountPath: "/src"
+export const options: KubernetesOptions = {
+  mountPath: "/src",
+  serviceAccount: "brigade-worker"
 };
 
 /**
  * KubernetesOptions exposes options for Kubernetes configuration.
  */
 export class KubernetesOptions {
-  serviceAccount: string;
-  mountPath: string;
+  public serviceAccount: string;
+  public mountPath: string;
 }
 
 class K8sResult implements jobs.Result {
-  data: string;
+  public data: string;
   constructor(msg: string) {
     this.data = msg;
   }
-  toString(): string {
+  public toString(): string {
     return this.data;
   }
 }
@@ -67,9 +67,9 @@ class K8sResult implements jobs.Result {
  * Storage is implemented as a PVC. The PVC backing it MUST be ReadWriteMany.
  */
 export class BuildStorage {
-  proj: Project;
-  name: string;
-  build: string;
+  public proj: Project;
+  public name: string;
+  public build: string;
 
   /**
    * create initializes a new PVC for storing data.
@@ -82,7 +82,7 @@ export class BuildStorage {
     this.proj = project;
     this.name = e.workerID.toLowerCase();
     this.build = e.buildID;
-    let pvc = this.buildPVC(size);
+    const pvc = this.buildPVC(size);
     logger.log(`Creating PVC named ${this.name}`);
     return defaultClient
       .createNamespacedPersistentVolumeClaim(
@@ -98,7 +98,7 @@ export class BuildStorage {
    */
   public destroy(): Promise<boolean> {
     logger.log(`Destroying PVC named ${this.name}`);
-    let opts = new kubernetes.V1DeleteOptions();
+    const opts = new kubernetes.V1DeleteOptions();
     return defaultClient
       .deleteNamespacedPersistentVolumeClaim(
         this.name,
@@ -113,21 +113,21 @@ export class BuildStorage {
    * Get a PVC for a volume that lives for the duration of a build.
    */
   protected buildPVC(size: string): kubernetes.V1PersistentVolumeClaim {
-    let s = new kubernetes.V1PersistentVolumeClaim();
+    const s = new kubernetes.V1PersistentVolumeClaim();
     s.metadata = new kubernetes.V1ObjectMeta();
     s.metadata.name = this.name;
     s.metadata.labels = {
-      heritage: "brigade",
+      build: this.build,
       component: "buildStorage",
+      heritage: "brigade",
       project: this.proj.id,
-      worker: this.name,
-      build: this.build
+      worker: this.name
     };
 
     s.spec = new kubernetes.V1PersistentVolumeClaimSpec();
     s.spec.accessModes = ["ReadWriteMany"];
 
-    let res = new kubernetes.V1ResourceRequirements();
+    const res = new kubernetes.V1ResourceRequirements();
     res.requests = { storage: size };
     s.spec.resources = res;
     if (this.proj.kubernetes.buildStorageClass.length > 0) {
@@ -158,16 +158,16 @@ export function loadProject(name: string, ns: string): Promise<Project> {
  * JobRunner provides a Kubernetes implementation of the JobRunner interface.
  */
 export class JobRunner implements jobs.JobRunner {
-  name: string;
-  secret: kubernetes.V1Secret;
-  runner: kubernetes.V1Pod;
-  pvc: kubernetes.V1PersistentVolumeClaim;
-  project: Project;
-  event: BrigadeEvent;
-  job: jobs.Job;
-  client: kubernetes.Core_v1Api;
-  options: KubernetesOptions;
-  serviceAccount: string;
+  public name: string;
+  public secret: kubernetes.V1Secret;
+  public runner: kubernetes.V1Pod;
+  public pvc: kubernetes.V1PersistentVolumeClaim;
+  public project: Project;
+  public event: BrigadeEvent;
+  public job: jobs.Job;
+  public client: kubernetes.Core_v1Api;
+  public options: KubernetesOptions;
+  public serviceAccount: string;
 
   constructor(job: jobs.Job, e: BrigadeEvent, project: Project) {
     this.options = Object.assign({}, options);
@@ -180,9 +180,9 @@ export class JobRunner implements jobs.JobRunner {
 
     // $JOB-$BUILD
     this.name = `${job.name}-${this.event.buildID}`;
-    let commit = e.revision.commit || "master";
-    let secName = this.name;
-    let runnerName = this.name;
+    const commit = e.revision.commit || "master";
+    const secName = this.name;
+    const runnerName = this.name;
 
     this.secret = newSecret(secName);
     this.runner = newRunnerPod(
@@ -194,7 +194,7 @@ export class JobRunner implements jobs.JobRunner {
 
     // Experimenting with setting a deadline field after which something
     // can clean up existing builds.
-    let expiresAt = Date.now() + expiresInMSec;
+    const expiresAt = Date.now() + expiresInMSec;
 
     this.runner.metadata.labels.jobname = job.name;
     this.runner.metadata.labels.project = project.id;
@@ -207,9 +207,9 @@ export class JobRunner implements jobs.JobRunner {
     this.secret.metadata.labels.worker = e.workerID;
     this.secret.metadata.labels.build = e.buildID;
 
-    let envVars: kubernetes.V1EnvVar[] = [];
-    for (let key in job.env) {
-      let val = job.env[key];
+    const envVars: kubernetes.V1EnvVar[] = [];
+    for (const key in job.env) {
+      const val = job.env[key];
       this.secret.data[key] = b64enc(val);
 
       // Add reference to pod
@@ -217,8 +217,8 @@ export class JobRunner implements jobs.JobRunner {
         name: key,
         valueFrom: {
           secretKeyRef: {
-            name: secName,
-            key: key
+            key: key,
+            name: secName
           }
         }
       } as kubernetes.V1EnvVar);
@@ -226,7 +226,7 @@ export class JobRunner implements jobs.JobRunner {
 
     this.runner.spec.containers[0].env = envVars;
 
-    let mountPath = job.mountPath || this.options.mountPath;
+    const mountPath = job.mountPath || this.options.mountPath;
 
     // Add secret volume
     this.runner.spec.volumes = [
@@ -235,12 +235,15 @@ export class JobRunner implements jobs.JobRunner {
     ];
     this.runner.spec.containers[0].volumeMounts = [
       { name: secName, mountPath: "/hook" } as kubernetes.V1VolumeMount,
-      { name: "vcs-sidecar", mountPath: mountPath } as kubernetes.V1VolumeMount
+      {
+        name: "vcs-sidecar",
+        mountPath: `${mountPath}`
+      } as kubernetes.V1VolumeMount
     ];
 
     if (job.useSource && project.repo.cloneURL) {
       // Add the sidecar.
-      let sidecar = sidecarSpec(
+      const sidecar = sidecarSpec(
         e,
         "/src",
         project.kubernetes.vcsSidecar,
@@ -251,7 +254,7 @@ export class JobRunner implements jobs.JobRunner {
 
     if (job.imagePullSecrets) {
       this.runner.spec.imagePullSecrets = [];
-      for (let secret of job.imagePullSecrets) {
+      for (const secret of job.imagePullSecrets) {
         this.runner.spec.imagePullSecrets.push({ name: secret });
       }
     }
@@ -279,12 +282,12 @@ export class JobRunner implements jobs.JobRunner {
       this.pvc = this.cachePVC();
 
       // Now add volume mount to pod:
-      let mountName = this.cacheName();
+      const mountName = this.cacheName();
       this.runner.spec.volumes.push({
         name: mountName,
         persistentVolumeClaim: { claimName: mountName }
       } as kubernetes.V1Volume);
-      let mnt = volumeMount(mountName, job.cache.path);
+      const mnt = volumeMount(mountName, job.cache.path);
       this.runner.spec.containers[0].volumeMounts.push(mnt);
     }
 
@@ -295,27 +298,27 @@ export class JobRunner implements jobs.JobRunner {
         name: vname,
         persistentVolumeClaim: { claimName: e.workerID.toLowerCase() }
       } as kubernetes.V1Volume);
-      let mnt = volumeMount(vname, job.storage.path);
+      const mnt = volumeMount(vname, job.storage.path);
       this.runner.spec.containers[0].volumeMounts.push(mnt);
     }
 
     // If the job needs access to a docker daemon, mount in the host's docker socket
     if (job.docker.enabled && project.allowHostMounts) {
-      var dockerVol = new kubernetes.V1Volume();
-      var dockerMount = new kubernetes.V1VolumeMount();
-      var hostPath = new kubernetes.V1HostPathVolumeSource();
+      const dockerVol = new kubernetes.V1Volume();
+      const dockerMount = new kubernetes.V1VolumeMount();
+      const hostPath = new kubernetes.V1HostPathVolumeSource();
       hostPath.path = jobs.dockerSocketMountPath;
       dockerVol.name = jobs.dockerSocketMountName;
       dockerVol.hostPath = hostPath;
       dockerMount.name = jobs.dockerSocketMountName;
       dockerMount.mountPath = jobs.dockerSocketMountPath;
       this.runner.spec.volumes.push(dockerVol);
-      for (let i = 0; i < this.runner.spec.containers.length; i++) {
-        this.runner.spec.containers[i].volumeMounts.push(dockerMount);
+      for (const c of this.runner.spec.containers) {
+        c.volumeMounts.push(dockerMount);
       }
     }
 
-    let newCmd = generateScript(job);
+    const newCmd = generateScript(job);
     if (!newCmd) {
       this.runner.spec.containers[0].command = null;
     } else {
@@ -324,8 +327,8 @@ export class JobRunner implements jobs.JobRunner {
 
     // If the job askes for privileged mode and the project allows this, enable it.
     if (job.privileged && project.allowPrivilegedJobs) {
-      for (let i = 0; i < this.runner.spec.containers.length; i++) {
-        this.runner.spec.containers[i].securityContext.privileged = true;
+      for (const c of this.runner.spec.containers) {
+        c.securityContext.privileged = true;
       }
     }
   }
@@ -350,9 +353,9 @@ export class JobRunner implements jobs.JobRunner {
    * Success (resolve) or Failure (reject)
    */
   public run(): Promise<jobs.Result> {
-    let podName = this.name;
-    let k = this.client;
-    let ns = this.project.kubernetes.namespace;
+    const podName = this.name;
+    const k = this.client;
+    const ns = this.project.kubernetes.namespace;
     return this.start()
       .then(r => r.wait())
       .then(r => {
@@ -363,13 +366,15 @@ export class JobRunner implements jobs.JobRunner {
       });
   }
 
-  /** start begins a job, and returns once it is scheduled to run.*/
+  /**
+   * start begins a job, and returns once it is scheduled to run.
+   */
   public start(): Promise<jobs.JobRunner> {
     // Now we have pod and a secret defined. Time to create them.
 
-    let ns = this.project.kubernetes.namespace;
-    let k = this.client;
-    let pvcPromise = this.checkOrCreateCache();
+    const ns = this.project.kubernetes.namespace;
+    const k = this.client;
+    const pvcPromise = this.checkOrCreateCache();
 
     return new Promise((resolve, reject) => {
       pvcPromise
@@ -401,12 +406,12 @@ export class JobRunner implements jobs.JobRunner {
    */
   protected checkOrCreateCache(): Promise<string> {
     return new Promise((resolve, reject) => {
-      let ns = this.project.kubernetes.namespace;
-      let k = this.client;
+      const ns = this.project.kubernetes.namespace;
+      const k = this.client;
       if (!this.pvc) {
         resolve("no cache requested");
       } else {
-        let cname = this.cacheName();
+        const cname = this.cacheName();
         logger.log(`looking up ${ns}/${cname}`);
         k
           .readNamespacedPersistentVolumeClaim(cname, ns)
@@ -431,13 +436,15 @@ export class JobRunner implements jobs.JobRunner {
     });
   }
 
-  /** wait listens for the running job to complete.*/
+  /**
+   * wait listens for the running job to complete.
+   */
   public wait(): Promise<jobs.Result> {
     // Should probably protect against the case where start() was not called
-    let k = this.client;
-    let timeout = this.job.timeout || 60000;
-    let name = this.name;
-    let ns = this.project.kubernetes.namespace;
+    const k = this.client;
+    const timeout = this.job.timeout || 60000;
+    const name = this.name;
+    const ns = this.project.kubernetes.namespace;
     let cancel = false;
 
     // This is a handle to clear the setTimeout when the promise is fulfilled.
@@ -456,32 +463,32 @@ export class JobRunner implements jobs.JobRunner {
     // will remain running until all timeouts have executed.
 
     // Poll the server waiting for a Succeeded.
-    let poll = new Promise((resolve, reject) => {
-      let pollOnce = (name, ns, i) => {
+    const poll = new Promise((resolve, reject) => {
+      const pollOnce = (name, ns, i) => {
         k
           .readNamespacedPod(name, ns)
           .then(response => {
-            let pod = response.body;
-            if (pod.status == undefined) {
+            const pod = response.body;
+            if (pod.status === undefined) {
               logger.log("Pod not yet scheduled");
               return;
             }
-            let phase = pod.status.phase;
-            if (phase == "Succeeded") {
+            const phase = pod.status.phase;
+            if (phase === "Succeeded") {
               clearTimers();
-              let result = new K8sResult(phase);
+              const result = new K8sResult(phase);
               resolve(result);
-            } else if (phase == "Failed") {
+            } else if (phase === "Failed") {
               clearTimers();
               reject(new Error(`Pod ${name} failed to run to completion`));
-            } else if (phase == "Pending") {
+            } else if (phase === "Pending") {
               // Trap image pull errors and consider them fatal.
-              let cs = pod.status.containerStatuses;
+              const cs = pod.status.containerStatuses;
               if (
                 cs &&
                 cs.length > 0 &&
                 cs[0].state.waiting &&
-                cs[0].state.waiting.reason == "ErrImagePull"
+                cs[0].state.waiting.reason === "ErrImagePull"
               ) {
                 k
                   .deleteNamespacedPod(
@@ -508,7 +515,7 @@ export class JobRunner implements jobs.JobRunner {
             reject(reason);
           });
       };
-      let interval = setInterval(() => {
+      const interval = setInterval(() => {
         if (cancel) {
           clearInterval(interval);
           clearTimeout(waiter);
@@ -516,14 +523,14 @@ export class JobRunner implements jobs.JobRunner {
         }
         pollOnce(name, ns, interval);
       }, 2000);
-      let clearTimers = () => {
+      const clearTimers = () => {
         clearInterval(interval);
         clearTimeout(waiter);
       };
     });
 
     // This will fail if the timelimit is reached.
-    let timer = new Promise((solve, reject) => {
+    const timer = new Promise((solve, reject) => {
       waiter = setTimeout(() => {
         cancel = true;
         reject("time limit exceeded");
@@ -538,12 +545,12 @@ export class JobRunner implements jobs.JobRunner {
    * A cache PVC persists between builds. So this is addressable as a Job on a Project.
    */
   protected cachePVC(): kubernetes.V1PersistentVolumeClaim {
-    let s = new kubernetes.V1PersistentVolumeClaim();
+    const s = new kubernetes.V1PersistentVolumeClaim();
     s.metadata = new kubernetes.V1ObjectMeta();
     s.metadata.name = this.cacheName();
     s.metadata.labels = {
-      heritage: "brigade",
       component: "jobCache",
+      heritage: "brigade",
       job: this.job.name,
       project: this.project.id
     };
@@ -556,7 +563,7 @@ export class JobRunner implements jobs.JobRunner {
     ) {
       s.spec.storageClassName = this.project.kubernetes.cacheStorageClass;
     }
-    let res = new kubernetes.V1ResourceRequirements();
+    const res = new kubernetes.V1ResourceRequirements();
     res.requests = { storage: this.job.cache.size };
     s.spec.resources = res;
 
@@ -570,14 +577,14 @@ function sidecarSpec(
   image: string,
   project: Project
 ): kubernetes.V1Container {
-  var imageTag = image;
-  let initGitSubmodules = project.repo.initGitSubmodules;
+  let imageTag = image;
+  const initGitSubmodules = project.repo.initGitSubmodules;
 
   if (!imageTag) {
     imageTag = "deis/git-sidecar:latest";
   }
 
-  let spec = new kubernetes.V1Container();
+  const spec = new kubernetes.V1Container();
   (spec.name = "vcs-sidecar"),
     (spec.env = [
       envVar("CI", "true"),
@@ -629,15 +636,15 @@ function newRunnerPod(
   imageForcePull: boolean,
   serviceAccount: string
 ): kubernetes.V1Pod {
-  let pod = new kubernetes.V1Pod();
+  const pod = new kubernetes.V1Pod();
   pod.metadata = new kubernetes.V1ObjectMeta();
   pod.metadata.name = podname;
   pod.metadata.labels = {
-    heritage: "brigade",
-    component: "job"
+    component: "job",
+    heritage: "brigade"
   };
 
-  let c1 = new kubernetes.V1Container();
+  const c1 = new kubernetes.V1Container();
   c1.name = "brigaderun";
   c1.image = brigadeImage;
   c1.command = ["/bin/sh", "/hook/main.sh"];
@@ -653,21 +660,21 @@ function newRunnerPod(
 }
 
 function newSecret(name: string): kubernetes.V1Secret {
-  let s = new kubernetes.V1Secret();
+  const s = new kubernetes.V1Secret();
   s.type = "brigade.sh/job";
   s.metadata = new kubernetes.V1ObjectMeta();
   s.metadata.name = name;
   s.metadata.labels = {
-    heritage: "brigade",
-    component: "job"
+    component: "job",
+    heritage: "brigade"
   };
-  s.data = {}; //{"main.sh": b64enc("echo hello && echo goodbye")}
+  s.data = {}; // {"main.sh": b64enc("echo hello && echo goodbye")}
 
   return s;
 }
 
 function envVar(key: string, value: string): kubernetes.V1EnvVar {
-  let e = new kubernetes.V1EnvVar();
+  const e = new kubernetes.V1EnvVar();
   e.name = key;
   e.value = value;
   return e;
@@ -677,7 +684,7 @@ function volumeMount(
   name: string,
   mountPath: string
 ): kubernetes.V1VolumeMount {
-  let v = new kubernetes.V1VolumeMount();
+  const v = new kubernetes.V1VolumeMount();
   v.name = name;
   v.mountPath = mountPath;
   return v;
@@ -692,13 +699,13 @@ export function b64dec(encoded: string): string {
 }
 
 function generateScript(job: jobs.Job): string | null {
-  if (job.tasks.length == 0) {
+  if (job.tasks.length === 0) {
     return null;
   }
   let newCmd = "#!" + job.shell + "\n\n";
 
   // if shells that support the `set` command are selected, let's add some sane defaults
-  if (job.shell == "/bin/sh" || job.shell == "/bin/bash") {
+  if (job.shell === "/bin/sh" || job.shell === "/bin/bash") {
     newCmd += "set -e\n\n";
   }
 
@@ -718,24 +725,24 @@ export function secretToProject(
   ns: string,
   secret: kubernetes.V1Secret
 ): Project {
-  let p: Project = {
-    id: secret.metadata.name,
-    name: b64dec(secret.data.repository),
-    kubernetes: {
-      namespace: secret.metadata.namespace || ns,
-      buildStorageSize: "50Mi",
-      vcsSidecar: "",
-      cacheStorageClass: "",
-      buildStorageClass: ""
-    },
-    repo: {
-      name: secret.metadata.annotations["projectName"],
-      cloneURL: null,
-      initGitSubmodules: false
-    },
-    secrets: {},
+  const p: Project = {
+    allowHostMounts: false,
     allowPrivilegedJobs: true,
-    allowHostMounts: false
+    id: secret.metadata.name,
+    kubernetes: {
+      buildStorageClass: "",
+      buildStorageSize: "50Mi",
+      cacheStorageClass: "",
+      namespace: secret.metadata.namespace || ns,
+      vcsSidecar: ""
+    },
+    name: b64dec(secret.data.repository),
+    repo: {
+      cloneURL: null,
+      initGitSubmodules: false,
+      name: secret.metadata.annotations.projectName
+    },
+    secrets: {}
   };
   if (secret.data.vcsSidecar) {
     p.kubernetes.vcsSidecar = b64dec(secret.data.vcsSidecar);
@@ -747,16 +754,16 @@ export function secretToProject(
     p.repo.cloneURL = b64dec(secret.data.cloneURL);
   }
   if (secret.data.initGitSubmodules) {
-    p.repo.initGitSubmodules = b64dec(secret.data.initGitSubmodules) == "true";
+    p.repo.initGitSubmodules = b64dec(secret.data.initGitSubmodules) === "true";
   }
   if (secret.data.secrets) {
     p.secrets = JSON.parse(b64dec(secret.data.secrets));
   }
   if (secret.data.allowPrivilegedJobs) {
-    p.allowPrivilegedJobs = b64dec(secret.data.allowPrivilegedJobs) == "true";
+    p.allowPrivilegedJobs = b64dec(secret.data.allowPrivilegedJobs) === "true";
   }
   if (secret.data.allowHostMounts) {
-    p.allowHostMounts = b64dec(secret.data.allowHostMounts) == "true";
+    p.allowHostMounts = b64dec(secret.data.allowHostMounts) === "true";
   }
   if (secret.data.sshKey) {
     p.repo.sshKey = b64dec(secret.data.sshKey);

@@ -17,7 +17,7 @@ export class Group {
    * `(new Group(jobs)).runAll()`
    */
   public static runAll(jobs: jobImpl.Job[]): Promise<jobImpl.Result[]> {
-    let g = new Group(jobs);
+    const g = new Group(jobs);
     return g.runAll();
   }
   /**
@@ -27,7 +27,7 @@ export class Group {
    * It is equivalent to `(new Group(jobs)).runEach()`
    */
   public static runEach(jobs: jobImpl.Job[]): Promise<jobImpl.Result[]> {
-    let g = new Group(jobs);
+    const g = new Group(jobs);
     return g.runEach();
   }
 
@@ -39,7 +39,7 @@ export class Group {
    * add adds one or more jobs to the group.
    */
   public add(...j: jobImpl.Job[]): void {
-    for (let jj of j) {
+    for (const jj of j) {
       this.jobs.push(jj);
     }
   }
@@ -69,8 +69,8 @@ export class Group {
    * runAll runs all jobs in parallel and waits for them all to finish.
    */
   public runAll(): Promise<jobImpl.Result[]> {
-    let plist: Promise<jobImpl.Result>[] = [];
-    for (let j of this.jobs) {
+    const plist: Promise<jobImpl.Result>[] = [];
+    for (const j of this.jobs) {
       plist.push(j.run());
     }
     return Promise.all(plist);

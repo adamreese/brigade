@@ -1,5 +1,5 @@
-import * as PrettyError from "pretty-error";
 import * as path from "path";
+import * as PrettyError from "pretty-error";
 
 const rootPath = path.join(__dirname, "..");
 const pe = new PrettyError()
